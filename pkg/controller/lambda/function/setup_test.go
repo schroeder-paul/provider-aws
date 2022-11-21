@@ -1,6 +1,7 @@
 package function
 
 import (
+	svcapitypesv1beta1 "github.com/crossplane-contrib/provider-aws/apis/lambda/v1beta1"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -628,6 +629,291 @@ func TestGenerateUpdateFunctionConfigurationInput(t *testing.T) {
 
 			// Assert
 			if diff := cmp.Diff(tc.want.obj, actual, test.EquateConditions()); diff != "" {
+				t.Errorf("r: -want, +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestIsUpToDateCodeImage(t *testing.T) {
+	type args struct {
+		cr  *svcapitypesv1beta1.Function
+		obj *svcsdk.GetFunctionOutput
+	}
+	type want struct {
+		codeUpToDate bool
+	}
+
+	cases := map[string]struct {
+		args
+		want
+	}{
+		"UpdToDateForZipCodeSupply": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeZip),
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{},
+			},
+			want: want{
+				codeUpToDate: true,
+			},
+		},
+		"NotUpToDateIfNothingIsSet": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{},
+			},
+			want: want{
+				codeUpToDate: false,
+			},
+		},
+		"NotUpToDateIfNotConfiguration": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: nil,
+				},
+			},
+			want: want{
+				codeUpToDate: false,
+			},
+		},
+		"NotUpToDateIfNotConfigurationPackageType": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: &svcsdk.FunctionConfiguration{
+						PackageType: nil,
+					},
+				},
+			},
+			want: want{
+				codeUpToDate: false,
+			},
+		},
+		"NotUpToDateIfConfigurationPackageTypeZip": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: &svcsdk.FunctionConfiguration{
+						PackageType: aws.String(packageTypeZip),
+					},
+				},
+			},
+			want: want{
+				codeUpToDate: false,
+			},
+		},
+		"NotUpToDateIfNoCode": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: &svcsdk.FunctionConfiguration{
+						PackageType: aws.String(packageTypeImage),
+					},
+					Code: nil,
+				},
+			},
+			want: want{
+				codeUpToDate: false,
+			},
+		},
+		"NotUpToDateIfEmptyCode": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: &svcsdk.FunctionConfiguration{
+						PackageType: aws.String(packageTypeImage),
+					},
+					Code: &svcsdk.FunctionCodeLocation{},
+				},
+			},
+			want: want{
+				codeUpToDate: false,
+			},
+		},
+		"NotUpToDateIfCodePackageTypeNotECR": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: &svcsdk.FunctionConfiguration{
+						PackageType: aws.String(packageTypeImage),
+					},
+					Code: &svcsdk.FunctionCodeLocation{
+						RepositoryType: aws.String(repositoryTypeS3),
+					},
+				},
+			},
+			want: want{
+				codeUpToDate: false,
+			},
+		},
+		"NotUpToDateIfNoCodeImageURI": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+							CustomFunctionParameters: v1beta1.CustomFunctionParameters{
+								CustomFunctionCodeParameters: v1beta1.CustomFunctionCodeParameters{
+									ImageURI: aws.String("ecr.aws/repository/foo-image"),
+								},
+							},
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: &svcsdk.FunctionConfiguration{
+						PackageType: aws.String(packageTypeImage),
+					},
+					Code: &svcsdk.FunctionCodeLocation{
+						ImageUri:       nil,
+						RepositoryType: aws.String(repositoryTypeECR),
+					},
+				},
+			},
+			want: want{
+				codeUpToDate: false,
+			},
+		},
+		"NotUpToDateIfCodeImageNotMatch": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+							CustomFunctionParameters: v1beta1.CustomFunctionParameters{
+								CustomFunctionCodeParameters: v1beta1.CustomFunctionCodeParameters{
+									ImageURI: aws.String("ecr.aws/repository/foo-image"),
+								},
+							},
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: &svcsdk.FunctionConfiguration{
+						PackageType: aws.String(packageTypeImage),
+					},
+					Code: &svcsdk.FunctionCodeLocation{
+						ImageUri:       aws.String("ecr.aws/repository/bar-image"),
+						RepositoryType: aws.String(repositoryTypeECR),
+					},
+				},
+			},
+			want: want{
+				codeUpToDate: false,
+			},
+		},
+		"UpToDate": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+							CustomFunctionParameters: v1beta1.CustomFunctionParameters{
+								CustomFunctionCodeParameters: v1beta1.CustomFunctionCodeParameters{
+									ImageURI: aws.String("ecr.aws/repository/foo-image"),
+								},
+							},
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: &svcsdk.FunctionConfiguration{
+						PackageType: aws.String(packageTypeImage),
+					},
+					Code: &svcsdk.FunctionCodeLocation{
+						ImageUri:       aws.String("ecr.aws/repository/foo-image"),
+						RepositoryType: aws.String(repositoryTypeECR),
+					},
+				},
+			},
+			want: want{
+				codeUpToDate: true,
+			},
+		},
+		"UpToDateIfBothImageURIsNil": {
+			args: args{
+				cr: &svcapitypesv1beta1.Function{
+					Spec: svcapitypesv1beta1.FunctionSpec{
+						ForProvider: svcapitypesv1beta1.FunctionParameters{
+							PackageType: aws.String(packageTypeImage),
+							CustomFunctionParameters: v1beta1.CustomFunctionParameters{
+								CustomFunctionCodeParameters: v1beta1.CustomFunctionCodeParameters{
+									ImageURI: nil,
+								},
+							},
+						},
+					},
+				},
+				obj: &svcsdk.GetFunctionOutput{
+					Configuration: &svcsdk.FunctionConfiguration{
+						PackageType: aws.String(packageTypeImage),
+					},
+					Code: &svcsdk.FunctionCodeLocation{
+						ImageUri:       nil,
+						RepositoryType: aws.String(repositoryTypeECR),
+					},
+				},
+			},
+			want: want{
+				codeUpToDate: true,
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			actualUpToDate := isUpToDateCodeImage(tc.args.cr, tc.args.obj)
+
+			// Assert
+			if diff := cmp.Diff(tc.want.codeUpToDate, actualUpToDate); diff != "" {
 				t.Errorf("r: -want, +got:\n%s", diff)
 			}
 		})

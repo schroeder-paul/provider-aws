@@ -30,11 +30,11 @@ const (
 
 	// used in creation
 	packageTypeImage = string(svcapitypes.PackageType_Image)
-	// packageTypeZip   = string(svcapitypes.PackageType_Zip)
+	packageTypeZip   = string(svcapitypes.PackageType_Zip)
 
 	// used in observation
 	repositoryTypeECR = "ECR"
-	// repositoryTypeS3  = "S3"
+	repositoryTypeS3  = "S3"
 )
 
 // SetupFunction adds a controller that reconciles Function.
