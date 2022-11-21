@@ -266,7 +266,7 @@ func equalImageURI(cr *svcapitypes.Function, obj *svcsdk.GetFunctionOutput) bool
 	if actualImageURI(obj) == nil {
 		return false
 	}
-	return *cr.Spec.ForProvider.CustomFunctionCodeParameters.ImageURI != *actualImageURI(obj)
+	return aws.StringValue(cr.Spec.ForProvider.CustomFunctionCodeParameters.ImageURI) == aws.StringValue(obj.Code.ImageUri)
 }
 
 // isUpToDateCodeImage checks if FunctionConfiguration FunctionCodeLocation (Image) is up-to-date
