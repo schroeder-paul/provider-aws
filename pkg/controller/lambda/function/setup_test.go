@@ -39,7 +39,6 @@ var _ managed.ExternalConnecter = &connector{}
 func TestIsUpToDateEnvironment(t *testing.T) {
 	type want struct {
 		result bool
-		err    error
 	}
 
 	cases := map[string]struct {
@@ -53,7 +52,6 @@ func TestIsUpToDateEnvironment(t *testing.T) {
 			},
 			want: want{
 				result: true,
-				err:    nil,
 			},
 		},
 		"NilSourceNilAwsNoUpdate": {
@@ -63,10 +61,9 @@ func TestIsUpToDateEnvironment(t *testing.T) {
 			},
 			want: want{
 				result: true,
-				err:    nil,
 			},
 		},
-		"EmptySourceNoUpdate": {
+		"EmptySourceEmptyAWSNoUpdate": {
 			args: args{
 				cr: function(withSpec(v1beta1.FunctionParameters{
 					Environment: &v1beta1.Environment{
@@ -76,10 +73,9 @@ func TestIsUpToDateEnvironment(t *testing.T) {
 			},
 			want: want{
 				result: true,
-				err:    nil,
 			},
 		},
-		"NilSourceWithUpdate": {
+		"NilSourceEnvAWSWithUpdate": {
 			args: args{
 				cr: function(withSpec(v1beta1.FunctionParameters{})),
 				obj: &svcsdk.GetFunctionOutput{Configuration: &svcsdk.FunctionConfiguration{Environment: &svcsdk.EnvironmentResponse{
@@ -87,10 +83,9 @@ func TestIsUpToDateEnvironment(t *testing.T) {
 			},
 			want: want{
 				result: false,
-				err:    nil,
 			},
 		},
-		"NilAwsWithUpdate": {
+		"EnvSourceNilAwsWithUpdate": {
 			args: args{
 				cr: function(withSpec(v1beta1.FunctionParameters{
 					Environment: &v1beta1.Environment{
@@ -100,10 +95,9 @@ func TestIsUpToDateEnvironment(t *testing.T) {
 			},
 			want: want{
 				result: false,
-				err:    nil,
 			},
 		},
-		"NeedsUpdate": {
+		"NeedsUpdateDiffKeys": {
 			args: args{
 				cr: function(withSpec(v1beta1.FunctionParameters{
 					Environment: &v1beta1.Environment{
@@ -114,7 +108,19 @@ func TestIsUpToDateEnvironment(t *testing.T) {
 			},
 			want: want{
 				result: false,
-				err:    nil,
+			},
+		},
+		"NeedsUpdateDiffValues": {
+			args: args{
+				cr: function(withSpec(v1beta1.FunctionParameters{
+					Environment: &v1beta1.Environment{
+						Variables: map[string]*string{"tagKey1": aws.String("tagValue1")},
+					}})),
+				obj: &svcsdk.GetFunctionOutput{Configuration: &svcsdk.FunctionConfiguration{Environment: &svcsdk.EnvironmentResponse{
+					Variables: map[string]*string{"tagKey1": aws.String("tagValue2")}}}},
+			},
+			want: want{
+				result: false,
 			},
 		},
 		"NoUpdateNeeded": {
@@ -128,7 +134,6 @@ func TestIsUpToDateEnvironment(t *testing.T) {
 			},
 			want: want{
 				result: true,
-				err:    nil,
 			},
 		},
 		"NoUpdateNeededOutOfOrder": {
@@ -142,7 +147,6 @@ func TestIsUpToDateEnvironment(t *testing.T) {
 			},
 			want: want{
 				result: true,
-				err:    nil,
 			},
 		},
 	}
