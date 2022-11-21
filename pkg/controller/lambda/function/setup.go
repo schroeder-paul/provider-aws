@@ -224,46 +224,22 @@ func isUpToDateEnvironment(cr *svcapitypes.Function, obj *svcsdk.GetFunctionOutp
 	return cmp.Equal(envVars, awsVars, sortCmp, cmpopts.EquateEmpty())
 }
 
-func actualPackageType(obj *svcsdk.GetFunctionOutput) *string {
-	if obj.Configuration == nil {
-		return nil
-	}
-	return obj.Configuration.PackageType
-}
-
-func actualImageURI(obj *svcsdk.GetFunctionOutput) *string {
-	if obj.Code == nil {
-		return nil
-	}
-	return obj.Code.ImageUri
-}
-
-func isPackageType(cr *svcapitypes.Function, packageType string) bool {
-	return *cr.Spec.ForProvider.PackageType == packageType
-}
-
 func equalPackageType(cr *svcapitypes.Function, obj *svcsdk.GetFunctionOutput) bool {
-	if cr.Spec.ForProvider.PackageType == nil && actualPackageType(obj) == nil {
-		return true
-	}
-	if actualPackageType(obj) == nil {
+	if obj.Configuration == nil {
 		return false
 	}
-	return *cr.Spec.ForProvider.PackageType == *actualPackageType(obj)
+	return aws.StringValue(cr.Spec.ForProvider.PackageType) == aws.StringValue(obj.Configuration.PackageType)
 }
 
 func isRepositoryType(obj *svcsdk.GetFunctionOutput, repositoryType string) bool {
-	if obj.Code == nil || obj.Code.RepositoryType == nil {
+	if obj.Code == nil {
 		return false
 	}
-	return *obj.Code.RepositoryType == repositoryType
+	return aws.StringValue(obj.Code.RepositoryType) == repositoryType
 }
 
 func equalImageURI(cr *svcapitypes.Function, obj *svcsdk.GetFunctionOutput) bool {
-	if cr.Spec.ForProvider.CustomFunctionCodeParameters.ImageURI == nil && actualImageURI(obj) == nil {
-		return true
-	}
-	if actualImageURI(obj) == nil {
+	if obj.Code == nil {
 		return false
 	}
 	return aws.StringValue(cr.Spec.ForProvider.CustomFunctionCodeParameters.ImageURI) == aws.StringValue(obj.Code.ImageUri)
@@ -275,7 +251,7 @@ func isUpToDateCodeImage(cr *svcapitypes.Function, obj *svcsdk.GetFunctionOutput
 	desired := cr
 	actual := obj
 
-	if !isPackageType(desired, packageTypeImage) {
+	if aws.StringValue(desired.Spec.ForProvider.PackageType) == packageTypeZip {
 		return true
 	}
 	if !equalPackageType(desired, actual) {
