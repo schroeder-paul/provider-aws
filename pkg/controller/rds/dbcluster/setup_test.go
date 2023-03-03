@@ -211,35 +211,9 @@ func TestIsEngineVersionUpToDate(t *testing.T) {
 					},
 				},
 				out: &svcsdk.DescribeDBClustersOutput{
-					DBClusters: []*svcsdk.DBCluster{},
-				},
-			},
-			want: want{
-				isUpToDate: false,
-			},
-		},
-		"DesiredBeingManged": { // AWS default or managed by DBCluster
-			args: args{
-				cr: &svcapitypes.DBCluster{
-					Spec: svcapitypes.DBClusterSpec{
-						ForProvider: svcapitypes.DBClusterParameters{
-							CustomDBClusterParameters: svcapitypes.CustomDBClusterParameters{
-								VPCSecurityGroupIDs: nil,
-							},
-						},
-					},
-				},
-				out: &svcsdk.DescribeDBClustersOutput{
 					DBClusters: []*svcsdk.DBCluster{
 						{
-							VpcSecurityGroups: []*svcsdk.VpcSecurityGroupMembership{
-								{
-									VpcSecurityGroupId: ptr("sg-456"),
-								},
-								{
-									VpcSecurityGroupId: ptr("sg-123"),
-								},
-							},
+							EngineVersion: nil,
 						},
 					},
 				},
@@ -248,51 +222,19 @@ func TestIsEngineVersionUpToDate(t *testing.T) {
 				isUpToDate: true,
 			},
 		},
-		"ActualEmpty": {
+		"Default": {
 			args: args{
 				cr: &svcapitypes.DBCluster{
 					Spec: svcapitypes.DBClusterSpec{
 						ForProvider: svcapitypes.DBClusterParameters{
-							CustomDBClusterParameters: svcapitypes.CustomDBClusterParameters{
-								VPCSecurityGroupIDs: []string{"sg-123", "sg-456"},
-							},
+							EngineVersion: nil,
 						},
 					},
 				},
 				out: &svcsdk.DescribeDBClustersOutput{
 					DBClusters: []*svcsdk.DBCluster{
 						{
-							VpcSecurityGroups: nil,
-						},
-					},
-				},
-			},
-			want: want{
-				isUpToDate: false,
-			},
-		},
-		"Unsorted": {
-			args: args{
-				cr: &svcapitypes.DBCluster{
-					Spec: svcapitypes.DBClusterSpec{
-						ForProvider: svcapitypes.DBClusterParameters{
-							CustomDBClusterParameters: svcapitypes.CustomDBClusterParameters{
-								VPCSecurityGroupIDs: []string{"sg-123", "sg-456"},
-							},
-						},
-					},
-				},
-				out: &svcsdk.DescribeDBClustersOutput{
-					DBClusters: []*svcsdk.DBCluster{
-						{
-							VpcSecurityGroups: []*svcsdk.VpcSecurityGroupMembership{
-								{
-									VpcSecurityGroupId: ptr("sg-456"),
-								},
-								{
-									VpcSecurityGroupId: ptr("sg-123"),
-								},
-							},
+							EngineVersion: ptr("12.3"), // some AWS "default" value
 						},
 					},
 				},
@@ -306,23 +248,14 @@ func TestIsEngineVersionUpToDate(t *testing.T) {
 				cr: &svcapitypes.DBCluster{
 					Spec: svcapitypes.DBClusterSpec{
 						ForProvider: svcapitypes.DBClusterParameters{
-							CustomDBClusterParameters: svcapitypes.CustomDBClusterParameters{
-								VPCSecurityGroupIDs: []string{"sg-123", "sg-456"},
-							},
+							EngineVersion: ptr("12.3"),
 						},
 					},
 				},
 				out: &svcsdk.DescribeDBClustersOutput{
 					DBClusters: []*svcsdk.DBCluster{
 						{
-							VpcSecurityGroups: []*svcsdk.VpcSecurityGroupMembership{
-								{
-									VpcSecurityGroupId: ptr("sg-123"),
-								},
-								{
-									VpcSecurityGroupId: ptr("sg-456"),
-								},
-							},
+							EngineVersion: ptr("12.3"), // some AWS "default" value
 						},
 					},
 				},
@@ -331,11 +264,143 @@ func TestIsEngineVersionUpToDate(t *testing.T) {
 				isUpToDate: true,
 			},
 		},
+		"Different": {
+			args: args{
+				cr: &svcapitypes.DBCluster{
+					Spec: svcapitypes.DBClusterSpec{
+						ForProvider: svcapitypes.DBClusterParameters{
+							EngineVersion: ptr("13.0"),
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBClustersOutput{
+					DBClusters: []*svcsdk.DBCluster{
+						{
+							EngineVersion: ptr("12.3"),
+						},
+					},
+				},
+			},
+			want: want{
+				isUpToDate: false,
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			isUpToDate := areVPCSecurityGroupIDsUpToDate(tc.args.cr, tc.args.out)
+			isUpToDate := isEngineVersionUpToDate(tc.args.cr, tc.args.out)
+
+			if diff := cmp.Diff(tc.want.isUpToDate, isUpToDate); diff != "" {
+				t.Errorf("r: -want, +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestIsDBClusterParameterGroupNameUpToDate(t *testing.T) {
+	type args struct {
+		cr  *svcapitypes.DBCluster
+		out *svcsdk.DescribeDBClustersOutput
+	}
+
+	type want struct {
+		isUpToDate bool
+	}
+
+	cases := map[string]struct {
+		args
+		want
+	}{
+		"Nil": {
+			args: args{
+				cr: &svcapitypes.DBCluster{
+					Spec: svcapitypes.DBClusterSpec{
+						ForProvider: svcapitypes.DBClusterParameters{
+							DBClusterParameterGroupName: nil,
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBClustersOutput{
+					DBClusters: []*svcsdk.DBCluster{
+						{
+							DBClusterParameterGroup: nil,
+						},
+					},
+				},
+			},
+			want: want{
+				isUpToDate: true,
+			},
+		},
+		"Default": {
+			args: args{
+				cr: &svcapitypes.DBCluster{
+					Spec: svcapitypes.DBClusterSpec{
+						ForProvider: svcapitypes.DBClusterParameters{
+							DBClusterParameterGroupName: nil,
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBClustersOutput{
+					DBClusters: []*svcsdk.DBCluster{
+						{
+							DBClusterParameterGroup: ptr("default.aurora-postgresql14"), // some AWS "default" value
+						},
+					},
+				},
+			},
+			want: want{
+				isUpToDate: true,
+			},
+		},
+		"Identical": {
+			args: args{
+				cr: &svcapitypes.DBCluster{
+					Spec: svcapitypes.DBClusterSpec{
+						ForProvider: svcapitypes.DBClusterParameters{
+							DBClusterParameterGroupName: ptr("default.aurora-postgresql14"),
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBClustersOutput{
+					DBClusters: []*svcsdk.DBCluster{
+						{
+							DBClusterParameterGroup: ptr("default.aurora-postgresql14"), // some AWS "default" value
+						},
+					},
+				},
+			},
+			want: want{
+				isUpToDate: true,
+			},
+		},
+		"Different": {
+			args: args{
+				cr: &svcapitypes.DBCluster{
+					Spec: svcapitypes.DBClusterSpec{
+						ForProvider: svcapitypes.DBClusterParameters{
+							DBClusterParameterGroupName: ptr("default.aurora-postgresql15"),
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBClustersOutput{
+					DBClusters: []*svcsdk.DBCluster{
+						{
+							DBClusterParameterGroup: ptr("default.aurora-postgresql14"),
+						},
+					},
+				},
+			},
+			want: want{
+				isUpToDate: false,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			isUpToDate := isDBClusterParameterGroupNameUpToDate(tc.args.cr, tc.args.out)
 
 			if diff := cmp.Diff(tc.want.isUpToDate, isUpToDate); diff != "" {
 				t.Errorf("r: -want, +got:\n%s", diff)

@@ -644,7 +644,7 @@ func isEngineVersionUpToDate(cr *svcapitypes.DBCluster, out *svcsdk.DescribeDBCl
 	// If EngineVersion is not set, AWS sets a default value,
 	// so we do not try to update in this case
 	if cr.Spec.ForProvider.EngineVersion != nil {
-		return aws.StringValue(cr.Spec.ForProvider.EngineVersion) != aws.StringValue(out.DBClusters[0].EngineVersion)
+		return aws.StringValue(cr.Spec.ForProvider.EngineVersion) == aws.StringValue(out.DBClusters[0].EngineVersion)
 	}
 	return true
 }
@@ -653,7 +653,7 @@ func isDBClusterParameterGroupNameUpToDate(cr *svcapitypes.DBCluster, out *svcsd
 	// If DBClusterParameterGroupName is not set, AWS sets a default value,
 	// so we do not try to update in this case
 	if cr.Spec.ForProvider.DBClusterParameterGroupName != nil {
-		return aws.StringValue(cr.Spec.ForProvider.DBClusterParameterGroupName) != aws.StringValue(out.DBClusters[0].DBClusterParameterGroup)
+		return aws.StringValue(cr.Spec.ForProvider.DBClusterParameterGroupName) == aws.StringValue(out.DBClusters[0].DBClusterParameterGroup)
 	}
 	return true
 }
